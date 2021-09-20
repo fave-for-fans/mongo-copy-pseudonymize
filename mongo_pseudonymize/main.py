@@ -1,5 +1,6 @@
 import json
 from pymongo import MongoClient
+from pymongo.errors import OperationFailure, DuplicateKeyError
 from tqdm import tqdm
 from functools import partial
 from copy import deepcopy
@@ -14,11 +15,24 @@ def read_config(config_filename):
 
     return config
 
-def get_database_connection(config, section):
+def get_database_connection(config, section, drop=False):
     """Get a pymongo connection."""
 
-    client = MongoClient(config[section + '_server'])
-    db = client[config[section + '_database']]
+
+    server = config[section + "_server"]
+    database = config[section + "_database"]
+
+    print(f"[ .. ] Connecting to {server} database {database}")
+    client = MongoClient(server)
+
+    if drop:
+        print(f"Dropping database {database} on {server}")
+        client.drop_database(database)
+
+    db = client[database]
+
+    print(f"[ OK ] Connected  to {server} database {database}")
+
     return db
 
 
@@ -26,9 +40,13 @@ def iterate_mongo(db):
     """Go over each entry in a database."""
     for collection_name in tqdm(db.list_collection_names(), desc="DB"):
         collection = source[collection_name]
-        for entry in tqdm(collection.find(), desc=collection_name,
-                          total=collection.estimated_document_count()):
-            yield collection_name, entry
+        try:
+            for entry in tqdm(collection.find(), desc=collection_name,
+                              total=collection.estimated_document_count()):
+                yield collection_name, entry
+        except OperationFailure as e:
+            print("Copy failed for collection " + collection_name)
+            print(e)
 
 def sink(g):
     """Iterate over all entries."""
@@ -57,7 +75,10 @@ def pseudonymize(collection, entry, pseudonymizer, config):
 
 def write_entry(collection, entry, db):
     """Write data to a collection."""
-    db[collection].insert_one(entry)
+    try:
+        db[collection].insert_one(entry)
+    except DuplicateKeyError:
+        pass
     return collection, entry
 
 
@@ -94,16 +115,17 @@ class CountPseudonymizer():
 
 parser = argparse.ArgumentParser(description="Copy a mongo database with pseudonymization")
 parser.add_argument('--config', type=str, required=True)
+parser.add_argument('--drop', action='store_true')
 
 if __name__ == '__main__':
     # obtaining config filename from command line
     args = parser.parse_args()
-    config_filename = args.config
 
     # connecting to the source and to the destination
-    config = read_config(config_filename)
+    config = read_config(args.config)
     source = get_database_connection(config, "source")
-    destination = get_database_connection(config, "destination")
+    destination = get_database_connection(config, "destination",
+                                          drop=args.drop)
 
     # function to pseudonymize entries
     pseudonymize_p = partial(pseudonymize,
