@@ -1,0 +1,12 @@
+{
+    "source_server": "mongodb+srv://zzz.mongodb.net/yyy",
+    "source_database": "source",
+
+    "destination_server": "mongodb://127.0.0.1:27017",
+    "destination_database": "xxx",
+
+    "pseudonymize":
+      {
+	"users": ["email", "password", "phoneNumber"]
+      }
+}
