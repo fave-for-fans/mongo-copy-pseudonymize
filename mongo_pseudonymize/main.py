@@ -117,7 +117,10 @@ parser = argparse.ArgumentParser(description="Copy a mongo database with pseudon
 parser.add_argument('--config', type=str, required=True)
 parser.add_argument('--drop', action='store_true')
 
-if __name__ == '__main__':
+
+def main_fcn():
+    """Main function to run."""
+
     # obtaining config filename from command line
     args = parser.parse_args()
 
