@@ -39,7 +39,7 @@ def get_database_connection(config, section, drop=False):
 def iterate_mongo(db):
     """Go over each entry in a database."""
     for collection_name in tqdm(db.list_collection_names(), desc="DB"):
-        collection = source[collection_name]
+        collection = db[collection_name]
         try:
             for entry in tqdm(collection.find(), desc=collection_name,
                               total=collection.estimated_document_count()):
